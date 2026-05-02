@@ -24,16 +24,38 @@ def get_prompt(name: str) -> str:
         raise KeyError(f"Unknown prompt template: {name}. Available: {available}") from e
 
 
-COLUMN_MAPPING_PROMPT = """You are a data analyst generating training data for text-to-SQL.
+COLUMN_MAPPING_PROMPT = """
+You are a data analyst generating training data for text-to-SQL.
 
 TASK:
-Generate {N} knowledge-question-SQL triples.
+Generate {N} knowledge–question–SQL triples.
 
-Knowledge Type:
-column mapping (a concept maps to one or more columns)
+Knowledge type:
+column mapping (a concept maps to columns)
 
 Definition:
 A business concept corresponds directly to one or more database columns.
+
+Triple Examples:
+[
+    {
+        "question": "State the names and full communication address of high schools in Monterey which has more than 800 free or reduced price meals for ages 15-17? ",
+        "knowledge": "Full communication address should include Zip, Street, City, State",
+        "sql": "SELECT T1.School, T1.Zip, T1.Street, T1.City, T1.State FROM schools T1 JOIN frpm T2 ON T1.CDSCode = T2.CDSCode WHERE T1.EILName = 'High School' AND T1.City = 'Monterey' AND T2.`FRPM Count (Ages 5-17)` > 800"
+    },
+    {
+        "question": "Show the usernames and their join dates.",
+        "knowledge": "join date corresponds to account_created_at",
+        "sql": "SELECT username, account_created_at FROM users"
+    },
+    {
+        "question": "What are the titles and release years of all films?",
+        "knowledge": "film corresponds to movies table; release year corresponds to release_date",
+        "sql": "SELECT movie_title, release_date FROM movies"
+]
+
+
+
 
 Requirements:
 1. Identify one column-mapping knowledge from the schema.
@@ -42,42 +64,51 @@ Requirements:
 4. Use only schema information.
 5. Do not invent tables or columns.
 
-Triple Examples:
-[
-    {{
-        "question": "List the names and mailing addresses of all schools.",
-        "knowledge": "Mailing address corresponds to Zip, Street, City, State",
-        "sql": "SELECT School, Zip, Street, City, State FROM schools"
-    }},
-    {{
-        "question": "Show the usernames and their join dates.",
-        "knowledge": "join date corresponds to account_created_at",
-        "sql": "SELECT username, account_created_at FROM users"
-    }},
-    {{
-        "question": "What are the titles and release years of all films?",
-        "knowledge": "film corresponds to movies table; release year corresponds to release_date",
-        "sql": "SELECT movie_title, release_date FROM movies"
-    }}
-]
-
 SCHEMA:
 {schema}
 
-Now, please Generate {N} knowledge-question-SQL triples. ONLY OUTPUT JSON ARRAY FORMAT.
+Now, please Generate {N} knowledge–question–SQL triples. ONLY OUTPUT JSON ARRAY FORMAT.
+```json
+[
+    {
+        "question": "...",
+        "knowledge": "...",
+        "sql": "..."
+    }
+]
+``` 
 """
 
-
-TERM_DEFINITION_PROMPT = """You are a data analyst generating training data for text-to-SQL.
+TERM_DEFINITION_PROMPT = """
+You are a data analyst generating training data for text-to-SQL.
 
 TASK:
-Generate {N} knowledge-question-SQL triples.
+Generate {N} knowledge–question–SQL triples.
 
-Knowledge Type:
+Knowledge type:
 term definition (a term maps to a value meaning)
 
 Definition:
 A business/domain term corresponds to a specific column value.
+
+Triple Examples:
+[
+    {
+        "question": "For season 9, episode 17 of the show Law and Order, how many roles have been included in the credit?",
+        "knowledge": "Law and Order refers to series = 'Law and Order'; included in the credit refers to credited = 'true'",
+        "sql": "SELECT COUNT(T2.role) FROM Episode AS T1 INNER JOIN Credit AS T2 ON T1.episode_id = T2.episode_id WHERE T1.series = 'Law and Order' AND T1.season = 9 AND T1.episode = 17 AND T2.credited = 'true'"
+    },
+    {
+        "question": "List down the product IDs and names that include the word \"Outdoor\".",
+        "evidence": "names that include the word \"Outdoor\" refer to Product Name LIKE '%Outdoor%';",
+        "SQL": "SELECT ProductID, T FROM ( SELECT ProductID , CASE  WHEN `Product Name` LIKE '%Outdoor%' THEN `Product Name` ELSE NULL END AS T FROM Products ) WHERE T IS NOT NULL ORDER BY T DESC"
+    },
+    {
+        "question": "What are the names of the person that were not credited at the end of episode tt0629391?",
+        "knowledge": "not credited refers to credited = ''; episode tt0629391 refers to episode_id = 'tt0629391'",
+        "sql": "SELECT T2.name FROM Credit AS T1 INNER JOIN Person AS T2 ON T2.person_id = T1.person_id WHERE T1.credited = 'false' AND T1.episode_id = 'tt0629391'"
+    }
+]
 
 Requirements:
 1. Identify one term-definition knowledge from the schema.
@@ -86,108 +117,80 @@ Requirements:
 4. Use only schema information.
 5. Do not invent tables or columns.
 
-Triple Examples:
-[
-    {{
-        "question": "For season 9, episode 17 of the show Law and Order, how many roles have been included in the credit?",
-        "knowledge": "Law and Order refers to series = 'Law and Order'; included in the credit refers to credited = 'true'",
-        "sql": "SELECT COUNT(T2.role) FROM Episode AS T1 INNER JOIN Credit AS T2 ON T1.episode_id = T2.episode_id WHERE T1.series = 'Law and Order' AND T1.season = 9 AND T1.episode = 17 AND T2.credited = 'true'"
-    }},
-    {{
-        "question": "List down the product IDs and names that include the word \\"Outdoor\\".",
-        "knowledge": "names that include the word \\"Outdoor\\" refer to `Product Name` LIKE '%Outdoor%'",
-        "sql": "SELECT ProductID, T FROM (SELECT ProductID, CASE WHEN `Product Name` LIKE '%Outdoor%' THEN `Product Name` ELSE NULL END AS T FROM Products) WHERE T IS NOT NULL ORDER BY T DESC"
-    }},
-    {{
-        "question": "What are the names of the person that were not credited at the end of episode tt0629391?",
-        "knowledge": "not credited refers to credited = 'false'; episode tt0629391 refers to episode_id = 'tt0629391'",
-        "sql": "SELECT T2.name FROM Credit AS T1 INNER JOIN Person AS T2 ON T2.person_id = T1.person_id WHERE T1.credited = 'false' AND T1.episode_id = 'tt0629391'"
-    }}
-]
-
 SCHEMA:
 {schema}
 
-Now, please Generate {N} knowledge-question-SQL triples. ONLY OUTPUT JSON ARRAY FORMAT.
+Now, please Generate {N} knowledge–question–SQL triples. ONLY OUTPUT JSON ARRAY FORMAT.
+```json
 [
-    {{
+    {
         "question": "...",
         "knowledge": "...",
         "sql": "..."
-    }}
+    }
 ]
+``` 
 """
 
 
-METRIC_DEFINITION_PROMPT = """You are a data analyst generating high-quality training data for text-to-SQL.
+generate_metric_definition_prompt = """
+You are a data analyst generating training data for text-to-SQL.
 
 TASK:
-Generate {N} knowledge-question-SQL triples.
+Generate {N} knowledge–question–SQL triple.
 
-Knowledge Type:
-metric definition knowledge
+Knowledge type:
+metric definition 
 
 Definition:
-A metric definition knowledge item describes a domain-specific analytical metric.
-The metric should be expressed as a professional or business term, and this
-term must be defined by aggregation or computation over one or more columns.
-The metric is not a direct column name, but a higher-level concept derived from
-database fields.
-
-Requirements for each triple:
-1. Define ONE domain-specific metric term.
-2. The knowledge must follow this style:
-   "Metric term" = formula over columns
-3. The metric term should represent a meaningful analytical concept, such as a
-   rate, ratio, score, average, gap, or derived indicator.
-4. The metric term must not be a direct restatement of a column name.
-5. The knowledge should focus on the metric definition only.
-6. Do NOT include column mapping knowledge or term-value filtering knowledge
-   unless they are necessary as part of the metric formula itself.
-7. The question should ask about the metric naturally, as a real analytical
-   question.
-8. The SQL must correctly implement the metric definition.
-9. Use only the provided schema.
+A metric defined using aggregation or computation over columns.
 
 Triple Examples:
 [
-    {{
-        "question": "Which school has the highest eligible free rate for K-12 students?",
-        "knowledge": "\\"Eligible free rate for K-12\\" = SUM(Free Meal Count (K-12)) / SUM(Enrollment (K-12))",
-        "sql": "SELECT school_name FROM schools ORDER BY CAST(`Free Meal Count (K-12)` AS REAL) / `Enrollment (K-12)` DESC LIMIT 1"
-    }},
-    {{
-        "question": "What is the excellence rate of each school?",
-        "knowledge": "\\"Excellence rate\\" = NumGE1500 / NumTstTakr",
-        "sql": "SELECT school_name, CAST(NumGE1500 AS REAL) / NumTstTakr FROM satscores"
-    }},
-    {{
-        "question": "Which department has the highest complaint resolution rate?",
-        "knowledge": "\\"Complaint resolution rate\\" = COUNT(resolved complaints) / COUNT(all complaints)",
-        "sql": "SELECT department_name FROM complaints GROUP BY department_name ORDER BY CAST(SUM(CASE WHEN complaint_status = 'Resolved' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) DESC LIMIT 1"
-    }},
-    {{
-        "question": "What is the on-time response rate of each company?",
-        "knowledge": "\\"On-time response rate\\" = COUNT(responses sent on time) / COUNT(all responses)",
-        "sql": "SELECT company_name, CAST(SUM(CASE WHEN julianday(`Date sent to company`) - julianday(`Date received`) <= 15 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) FROM complaints GROUP BY company_name"
-    }}
+    {
+        "question": "Who is the person who appeared the most in the series? Calculate in percentage how many times he or she appeared.",
+        "knowledge": "who refers to name; appear the most refers to max(count(person_id)); percentage = divide(count(person_id where max(count(person_id))), count(person_id)) * 100%",
+        "sql": "SELECT T2.person_id, CAST(COUNT(T2.person_id) AS REAL) * 100 / ( SELECT COUNT(T2.person_id) AS num FROM Credit AS T1 INNER JOIN Person AS T2 ON T2.person_id = T1.person_id ) AS per FROM Credit AS T1 INNER JOIN Person AS T2 ON T2.person_id = T1.person_id GROUP BY T2.person_id ORDER BY COUNT(T2.person_id) DESC LIMIT 1"
+    },
+    {
+        "question": "What is the social number of the client who has the longest delay in his/her complaint? Calculate the days of delay and state the company's response to the consumer.",
+        "knowledge": "social number refers to social; longest delay = max(subtract(Date sent to company, Date received)); days of delay = subtract(Date sent to company, Date received); company's response refers to 'Company response to consumer'",
+        "sql": "SELECT T1.social , 365 * (strftime('%Y', T2.`Date sent to company`) - strftime('%Y', T2.`Date received`)) + 30 * (strftime('%M', T2.`Date sent to company`) - strftime('%M', T2.`Date received`)) + (strftime('%d', T2.`Date sent to company`) - strftime('%d', T2.`Date received`)), T2.`Company response to consumer` FROM client AS T1 INNER JOIN events AS T2 ON T1.client_id = T2.Client_ID ORDER BY 365 * (strftime('%Y', T2.`Date sent to company`) - strftime('%Y', T2.`Date received`)) + 30 * (strftime('%M', T2.`Date sent to company`) - strftime('%M', T2.`Date received`)) + (strftime('%d', T2.`Date sent to company`) - strftime('%d', T2.`Date received`)) DESC LIMIT 1"
+    },
+    {
+        "question": "What is the percentage of the ratings were rated by user who was a subcriber?",
+        "knowledge": "user is a subscriber refers to user_subscriber = 1; percentage of ratings = DIVIDE(SUM(user_subscriber = 1), SUM(rating_score)) as percent;",
+        "sql": "SELECT CAST(SUM(CASE WHEN user_subscriber = 1 THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(*) FROM ratings"
+    },
+    {
+        "question": "How much higher is the average rating score of the movie \"Innocence Unprotected\" than the movie \"When Will I Be Loved\"?",
+        "knowledge": "Innocence Unprotected' and 'When Will I Be Loved' are movie_title; Average rating score = Divide(Sum(rating_score), Count(rating_id));",
+        "sql": "SELECT SUM(CASE WHEN T2.movie_title = 'Innocence Unprotected' THEN T1.rating_score ELSE 0 END) / SUM(CASE WHEN T2.movie_title = 'Innocence Unprotected' THEN 1 ELSE 0 END) - SUM(CASE WHEN T2.movie_title = 'When Will I Be Loved' THEN T1.rating_score ELSE 0 END) / SUM(CASE WHEN T2.movie_title = 'When Will I Be Loved' THEN 1 ELSE 0 END) FROM ratings AS T1 INNER JOIN movies AS T2 ON T1.movie_id = T2.movie_id"
+    }
 ]
+
+
+Requirements:
+1. Define one meaningful metric using schema columns.
+2. Generate a question asking for that metric.
+3. Generate the SQL query implementing the formula.
+4. Use aggregation when appropriate.
+5. Use only schema information.
 
 SCHEMA:
 {schema}
 
-Now generate {N} knowledge-question-SQL triples.
-
-ONLY OUTPUT JSON ARRAY FORMAT.
+Now, please Generate {N} knowledge–question–SQL triples. ONLY OUTPUT JSON ARRAY FORMAT.
+```json
 [
-    {{
+    {
         "question": "...",
         "knowledge": "...",
         "sql": "..."
-    }}
+    }
 ]
+``` 
 """
-
 
 LEVEL1_SYSTEM_PROMPT = """You are a strict annotator for NLQ-to-SQL question quality levels.
 
@@ -370,7 +373,7 @@ Optional Knowledge:
 """
 
 
-SQL_NEIGHBORHOOD_SYSTEM_PROMPT = """You are an expert Text-to-SQL data synthesis assistant.
+SQL_NEIGHBORHOOD_PROMPT = """You are an expert Text-to-SQL data synthesis assistant.
 
 Your task is to generate high-quality NLQ-SQL pairs under explicit SQL template
 guidance.
@@ -409,127 +412,95 @@ Do not output explanations.
 """
 
 
-SQL_NEIGHBORHOOD_USER_PROMPT = """[Original Question]
-{origin_question}
-
-[Original SQL]
-{origin_sql}
-
-[Original SQL Template]
-{origin_template}
-
-[Target SQL Template]
-{target_template}
-
-[Schema]
-{schema}
-
-[Knowledge]
-{knowledge}
-
-Generate one new NLQ-SQL pair that:
-1. is semantically close to the original question,
-2. follows the target SQL template,
-3. reflects a meaningful structural variation,
-4. is valid under the schema.
-
-Return JSON only.
-"""
+prompt_gen_sqls_by_skeleton = """
+You are an expert in a specific domain.
+You are provided with:
+    1. An SQL query template
+    2. A question that the query needs to answer
+    3. The schema of the relevant database
 
 
-QUESTION_REWRITE_SYSTEM_PROMPT = """You are a high-quality NLQ rewriting engine for Text-to-SQL datasets.
-
-Your task: Rewrite the original question into {n} diverse, natural, human-like
-variants that EXACTLY match the target SQL semantics.
-
-Core Rules (Non-Negotiable):
-1. Semantic Fidelity: Every rewritten question must 100% match the SQL's logic
-   (preserve filtering, aggregation, grouping, ordering, comparison, limit,
-   joins, etc.).
-2. No Trivial Rewrites: Do NOT just replace 1-2 words; change sentence
-   structure, phrasing, and style.
-3. No Schema Leaks: Do NOT mention table names, column names, "SQL",
-   "database", or "schema" unless naturally required.
-4. No Extra/Removed Content: Do NOT add new constraints/entities or omit
-   critical conditions from the SQL.
-
-Diversity Requirements (Enforced):
-- Use different sentence structures (simple, compound, complex).
-- Mix interrogative (Who/Which/Find) and imperative (List/Show) forms.
-- Vary how you phrase conditions/aggregations (e.g., "not in Australia" vs.
-  "outside Australia" vs. "territories other than Australia").
-- Alternate between concise and slightly descriptive formulations.
-- Avoid always starting with the same pattern (don't repeat "Which..." or
-  "Who..." every time).
-
-Output Format (Strict JSON Only):
+Your task is to:
+    1.Strictly use the information from the provided schema to generate {N} DISTINCT pairs of SQLite query and natural language question(NLQ). Ensure that all necessary table names, column names, and clauses (such as FROM and JOIN) come from the schema only.
+    2.Avoid introducing any table names, column names, or other elements that are not explicitly defined in the schema.
+    3.The generated {N} NLQ-SQL pairs need to fit the SQL query template.
+    4.the conditions should be much complex.
+    5.Keep the output json format.
+    6.Refer to the database schema, and ensure all SQLs in the {N} pairs are DISTINCT.
+    7.When information from multiple tables is needed, prefer explicit JOIN ... ON clauses to introduce fields from related tables, rather than using IN subqueries or equality-based subqueries, unless a subquery is strictly necessary.
+Example:
+Input:
+SQL Query Template: SELECT col_1, col_2  WHERE col_3 = value_0;
+Question: What are the names and descriptions of the different types of photos associated with objects in the astrophysical classifications from the specobj table?
+Database Schema:
+CREATE TABLE photo_type (
+    value number Example Values[(6,), (2,), (4,)],
+    name text Example Values[('GHOST',), ('STAR',), ('NOTATYPE',)],
+    description text Example Values[('Sky: Blank sky spectrogram (no objects in this arcsecond area).',), ('Trail: A satellite or asteroid or meteor trail. (not yet used)',), ('Unknown: Object type is not known.',)],
+    primary key (value),
+    foreign key (value) references photoobj(type),
+    foreign key (value) references neighbors(neighbortype)
+)
+CREATE TABLE specobj (
+    specobjid number ,
+    bestobjid number ,
+    plateid number Example Values[(Decimal('8253972328771233792'),), (Decimal('8255098229097506816'),), (Decimal('8034421845460527104'),)],
+    scienceprimary number Example Values[(1,)],
+    segue2primary number Example Values[(0,), (1,)],
+    survey text Example Values[('boss',), ('sdss',), ('eboss',)],
+    programname text Example Values[('boss',), ('legacy',), ('eboss',)],
+    mjd number ,
+    plate number ,
+    fiberid number ,
+    special_target1 number ,
+    segue2_target1 number ,
+    segue2_target2 number ,
+    ancillary_target1 number ,
+    ra number ,
+    dec number ,
+    z number ,
+    zerr number ,
+    zwarning number ,
+    class text Example Values[('GALAXY',), ('STAR',), ('QSO',)],
+    subclass text Example Values[(None,), ('BROADLINE',), ('STARFORMING',)],
+    veldisp number,
+    veldisperr number ,
+    loadversion number,
+    primary key (specobjid),
+    foreign key (bestobjid) references photoobj(objid)
+)
+Output:
 {{
-  "rewritten_questions": [
-    "...",
-    "...",
-    "..."
+  "pairs": [
+    {{
+      "question": "What are the names and descriptions of photo types where the object class is 'STAR'?",
+      "sql": "SELECT p.name, p.description FROM photo_type p JOIN specobj s ON p.value = s.bestobjid WHERE s.class = 'STAR';"
+    }},
+    {{
+      "question": "Retrieve the name and program name of photo types where the subclass is 'BROADLINE'.",
+      "sql": "SELECT p.name, s.programname FROM photo_type p JOIN specobj s ON p.value = s.bestobjid WHERE s.subclass = 'BROADLINE';"
+    }},
+    {{
+      "question": "What are the names and program names of photo types where the object class is 'QSO'?",
+      "sql": "SELECT p.name, s.programname FROM photo_type p JOIN specobj s ON p.value = s.bestobjid WHERE s.class = 'QSO';"
+    }},
+    {{
+      "question": "What are the names and program names of photo types where the RA (right ascension) is greater than 130?",
+      "sql": "SELECT p.name, s.programname FROM photo_type p JOIN specobj s ON p.value = s.bestobjid WHERE s.ra > 130;"
+    }}
   ]
 }}
 
-EXAMPLES:
-
-Example 1:
-Target SQL:
-SELECT s.BusinessEntityID FROM SalesPerson s JOIN SalesTerritory t ON s.TerritoryID = t.TerritoryID WHERE t.Name <> 'Australia';
-
-Rewritten Questions:
-[
-"List the identifiers of salespeople who are not assigned to Australia.",
-"Show the unique IDs of sales representatives working outside the Australian region.",
-"Provide the ID numbers of sales staff associated with non-Australian territories."
-]
-
-
-Example 2:
-Target SQL:
-SELECT s.BusinessEntityID FROM SalesPerson s JOIN SalesTerritory t ON s.TerritoryID = t.TerritoryID WHERE t.Name = 'Australia';
-
-Rewritten Questions:
-[
-"List the identifiers of salespeople assigned to Australia.",
-"Show the unique IDs of sales representatives working in the Australian region.",
-"Provide the ID numbers of sales staff associated with the Australian territory."
-]
-"""
-
-
-QUESTION_REWRITE_USER_PROMPT = """Generate exactly {n} rewritten questions for the target SQL.
-
-Original Question:
-{question}
-
-Target SQL:
-{sql}
-
-Schema:
+Now, it's your turn.
+Input:
+SQL Query Template: {skeleton}
+Question: {question}
+Knowledge:{knowledge}
+Database Schema: 
 {schema}
-
-Optional Knowledge:
-{knowledge}
-
-Final Requirements Recap:
-1. All rewritten questions must EXACTLY match the target SQL semantics.
-2. No trivial word swaps--change sentence structure and style.
-3. Questions must be diverse from each other and the original.
-4. Use natural, human-like language (no machine translation).
-5. Do NOT mention schema/table/column/SQL unless necessary.
-6. Do NOT generate explanations.
-7. Return strict JSON only.
-
-Return JSON only:
-{{
-  "rewritten_questions": [
-    "...",
-    "...",
-    "..."
-  ]
-}}
 """
+
+
 
 
 PROMPTS = {
@@ -548,12 +519,8 @@ PROMPTS = {
     "sql_generation": SQL_GENERATION_PROMPT,
 
     # SQL semantic neighborhood generation
-    "sql_neighborhood_system": SQL_NEIGHBORHOOD_SYSTEM_PROMPT,
-    "sql_neighborhood_user": SQL_NEIGHBORHOOD_USER_PROMPT,
+    "sql_neighborhood": SQL_NEIGHBORHOOD_PROMPT,
 
-    # Question rewriting
-    "question_rewrite_system": QUESTION_REWRITE_SYSTEM_PROMPT,
-    "question_rewrite_user": QUESTION_REWRITE_USER_PROMPT,
 }
 
 
