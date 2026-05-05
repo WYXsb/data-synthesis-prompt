@@ -373,46 +373,7 @@ Optional Knowledge:
 """
 
 
-SQL_NEIGHBORHOOD_PROMPT = """You are an expert Text-to-SQL data synthesis assistant.
-
-Your task is to generate high-quality NLQ-SQL pairs under explicit SQL template
-guidance.
-
-You will be given:
-1. the original natural language question,
-2. the original SQL query,
-3. the original SQL template,
-4. a target SQL template,
-5. the database schema,
-6. optional domain knowledge.
-
-Your goal is to generate a new NLQ-SQL pair such that:
-- the new question remains semantically close to the original,
-- the new SQL follows the target template as closely as possible,
-- the new SQL reflects a meaningful structural variation,
-- the new SQL is valid and consistent with the schema.
-
-Constraints:
-- Do not invent tables or columns.
-- Do not produce trivial paraphrases of the original pair.
-- Prefer meaningful structural changes (e.g., aggregation, filtering,
-  grouping, ordering, subqueries) guided by the target template.
-
-Return strictly valid JSON in the following format:
-{{
-  "pairs": [
-    {{
-      "question": "...",
-      "sql": "..."
-    }}
-  ]
-}}
-
-Do not output explanations.
-"""
-
-
-prompt_gen_sqls_by_skeleton = """
+SQL_NEIGHBORHOOD_PROMPT =  """
 You are an expert in a specific domain.
 You are provided with:
     1. An SQL query template
